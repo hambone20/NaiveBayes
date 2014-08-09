@@ -1,0 +1,1 @@
+_Naive Bayes_ machine learning example, performed on optical digit recognition in **Scala**
