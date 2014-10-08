@@ -1,18 +1,29 @@
 package naivebayes
 import Math.log
-import collection.mutable.ArrayBuffer
+import scala.collection.mutable
+
+/** Workhorse of our Bayesian classifier
+ * 
+ * @constructor creates a Bayesian classifier with a given training set
+ *              and initializes the model
+ * @param trainingSet the data to train our classifier on
+ * @param classes the possible classfications
+ * @param binning should the classes be binned
+ */
 
 class NaiveBayes(trainingSet: Array[Array[Int]], classes: Array[Int], binning: Boolean = false) {
   // Mapping will contain P on class 
   
-  val trainingSize = trainingSet.size
-  val numAttributes = trainingSet(0).size - 1
-  val attributeValues = if(!binning) Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16) 
-                        else Array(Array(0, 1, 2, 3, 4), Array(5, 6, 7, 8), Array(9, 10, 11, 12), Array(13, 14, 15, 16)) //bins
+  val trainingSize    = trainingSet.size
+  val numAttributes   = trainingSet.head.size - 1 // the last element is the actual classification
+  val attributeValues = if(!binning) Range(0, 17).toArray
+                        else Array(Range(0, 5).toArray, Range(5, 9).toArray, Range(9, 13).toArray, Range(13, 17).toArray) //bins
 
+  assert(trainingSize > 0, "Training set empty")
   val numValues = attributeValues.size
+  assert((binning && numValues == 4) || numValues == 17, "Error in sizing attributes")
   
-  var model = collection.mutable.Map[String, Double]() // hold our model
+  var model = Map[String, Double]() // hold our model
   
   // A. compute prior probability for each class ie. P('1')
   computePForClasses()
@@ -22,14 +33,23 @@ class NaiveBayes(trainingSet: Array[Array[Int]], classes: Array[Int], binning: B
   for(cls <- classes){
     	computePForEachAttribute(cls) // calc for given class
   }
-  
+  /** computes prior probability for all classes
+   * 
+   * i.e. P('1')
+   */
   def computePForClasses() {
     for(cls <- classes){
-      val count = trainingSet.filter(x => x.last == cls).size
-      model += Pair(cls.toString, count.toDouble / trainingSize)
+      val count = trainingSet.filter(_.last == cls).size
+      val P = count.toDouble / trainingSize
+      model += Tuple2(cls.toString, P)
     }
   }
   
+  /** computes prior probability for each attribute
+   * 
+   * i.e. P(Attribute1=0|'1')
+   * @param cls class to compute
+   */
   def computePForEachAttribute(cls: Int) { // adjust for Laplace smoothing
     val clsData = trainingSet.filter(x => x.last == cls)
     // attributes 0-16, numValues = 17 of them
@@ -42,14 +62,19 @@ class NaiveBayes(trainingSet: Array[Array[Int]], classes: Array[Int], binning: B
                         	 clsData.filter(x => value.asInstanceOf[Array[Int]].contains(x(attIdx)))
                          }
                  
-        model += Pair(key, (attValData.size + 1.0) / (clsData.size + numValues))
-       }    
-      }
+        model += Tuple2(key, (attValData.size + 1.0) / (clsData.size + numValues))
+      }    
+    }
   }
   
+  /** classify based on the training data given
+   * 
+   * @param testSet Data set to classify given the model
+   * @return array of classifications 
+   */
   def classify(testSet: Array[Array[Int]]) = {
     // calculate confidence interval for all classes, find class that maximizes
-    var result = ArrayBuffer[(Int, Double, Int)]()
+    var result = mutable.ArrayBuffer[(Int, Double, Int)]()
     for(test <- testSet){
 	    var maxClass = (0, 0.0) // class, confidence
 	    var initMax = false
@@ -74,11 +99,11 @@ class NaiveBayes(trainingSet: Array[Array[Int]], classes: Array[Int], binning: B
 	      }
 	      // confidence calced for given class
 	      if(confidence > maxClass._2 || !initMax){ // found new prospective class
-	        maxClass = Pair(cls, confidence)
+	        maxClass = Tuple2(cls, confidence)
 	        initMax = true
 	      }
 	    }
-	    result += Triple(actualClass, maxClass._2, maxClass._1)
+	    result += Tuple3(actualClass, maxClass._2, maxClass._1)
     }
     result
   }
