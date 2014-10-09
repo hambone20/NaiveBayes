@@ -1,12 +1,13 @@
 package naivebayes
-//import Math.log
-import scala.collection.mutable
 
-/**
- * Workhorse of our Bayesian classifier
+/**Workhorse of our Bayesian classifier
  *
  * @constructor creates a Bayesian classifier with a given training set
- *              and initializes the model
+ *              and initializes the model using the following algorithm
+ *  A. compute prior probability for each class ie. P('1')
+ *  B. compute conditional probabilities for each digit and for each value of each attribute. 
+ *     ie. P(Attribute1=0|'1') is the probability that Attribute 1 has value 0, given that the class is digit '1' 
+ *  C. smooth the conditional probabilities using Laplace (add-one) smoothing
  * @param trainingSet the data to train our classifier on
  * @param classes the possible classfications
  * @param binning should the classes be binned
@@ -15,27 +16,26 @@ import scala.collection.mutable
 class NaiveBayes(trainingSet: Array[Array[Int]], classes: Array[Int], binning: Boolean = false) {
   type Probability = Double
   val trainingSize = trainingSet.size
-  val numAttributes = trainingSet.head.size - 1 // the last element is the actual classification
-  val attributeValues = if (!binning) Range(0, 17).toArray
-  else Array(Range(0, 5).toArray, Range(5, 9).toArray, Range(9, 13).toArray, Range(13, 17).toArray) //bins
+  private val numAttributes = trainingSet.head.size - 1 // the last element is the actual classification
+  private val attributeValues = if(!binning) Range(0, 17).toArray
+                                else Array(Range(0, 5).toArray, Range(5, 9).toArray, 
+                                           Range(9, 13).toArray, Range(13, 17).toArray)
 
   assert(trainingSize > 0, "Training set empty")
-  val numValues = attributeValues.size
+  private val numValues = attributeValues.size
   assert((binning && numValues == 4) || numValues == 17, "Error in sizing attributes")
 
-  var model = Map[String, Probability]() // hold our model
+  private var model = Map[String, Probability]()
 
-  // A. compute prior probability for each class ie. P('1')
   computePForClasses()
-  // B. compute conditional probabilities for each digits and for each value of each attribute. 
-  // ie. P(Attribute1=0|'1') is the probability of that Attribute 1 has value 0, given that the class is digit '1' 
-  // C. smooth the conditional probabilities using Laplace (add-one) smoothing
+  
   for (cls <- classes) {
     computePForEachAttribute(cls) // calculate for all classes
   }
-  /**
-   * computes prior probability for all classes
-   *
+  // Model complete
+  assert(model.size == classes.size + (numAttributes+1) * numValues * classes.size, "Incomplete model")
+  
+  /**computes prior probability for all classes
    * i.e. P('1')
    */
   private def computePForClasses() {
@@ -47,8 +47,7 @@ class NaiveBayes(trainingSet: Array[Array[Int]], classes: Array[Int], binning: B
     assert(model.size == classes.size, "Error creating model for classes")
   }
 
-  /**
-   * computes prior probability for each attribute, adding Laplace smoothing
+  /**computes prior probability for each attribute, adding Laplace smoothing
    *
    * i.e. P(Attribute1=0|'1') is inserted into the model with the key: 1=0|1
    * @param cls class to compute
@@ -68,13 +67,12 @@ class NaiveBayes(trainingSet: Array[Array[Int]], classes: Array[Int], binning: B
       }
     }
   }
-  /* type aliases for classification */
+  // type aliases for classification
   type ActualClass = Int
   type ConfidenceLevel = Double
   type ClassifiedClass = Int
 
-  /**
-   * classify based on the training data given
+  /**classify based on the training data given
    *
    * calculate confidence interval for all classes, then find class that maximizes
    * @param testSet Data set to classify given the model
@@ -91,7 +89,7 @@ class NaiveBayes(trainingSet: Array[Array[Int]], classes: Array[Int], binning: B
         var confidence: ConfidenceLevel = Math.log(model(key)) // log P(class)
         for (attIdx <- 0 to numAttributes) {
           val value = attributeValues match {
-            case arr: Array[Int] => test(attIdx).toString 
+            case arr: Array[Int] => test(attIdx).toString
             case arr: Array[Array[Int]] => findAttribute(arr, test(attIdx))
             case _ => throw new Exception("Attributes were improperly formed")
           }
@@ -113,18 +111,17 @@ class NaiveBayes(trainingSet: Array[Array[Int]], classes: Array[Int], binning: B
     result
   }
 
-  /**
-   * A helper method for classify
+  /**A helper function for classify
    *
    * Finds attribute when binning is done
-   * @param haystack array to search for target
+   * @param haystacks array to search for target
    * @param needle target to be found
    * @return key value
    */
-  private def findAttribute(haystack: Array[Array[Int]], needle: Int): String = {
-    for (i <- 0 until haystack.size) {
-      if (haystack(i).contains(needle)) {
-        return haystack(i).mkString
+  private def findAttribute(haystacks: Array[Array[Int]], needle: Int): String = {
+    for (i <- 0 until haystacks.size) {
+      if (haystacks(i).contains(needle)) {
+        return haystacks(i).mkString
       }
     }
     throw new Exception("Attribute not found")
